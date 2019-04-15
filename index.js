@@ -9,8 +9,7 @@ const SlackStrategy = require('@aoberoi/passport-slack').default.Strategy;
 const http = require('http');
 const express = require('express');
 
-const Q = require('@nmq/q/client');
-const bot = new Q('bot');
+const superagent = require('superagent');
 
 
 // *** Initialize event adapter using signing secret from environment variables ***
@@ -71,36 +70,23 @@ app.get('/auth/slack/callback',
 // *** Plug the event adapter into the express app as middleware ***
 app.use('/slack/events', slackEvents.expressMiddleware());
 
+
+let tempMessage;
+let tempBody;
+
+
 // *** Attach listeners to the event adapter ***
 
 // *** Greeting any user that says "hi" ***
 slackEvents.on('message', (message, body) => {
-  // Only deal with messages that have no subtype (plain messages) and contain 'hi'
-  if (!message.subtype && message.text.indexOf('hi') >= 0) {
-    // Initialize a client
-    const slack = getClientByTeamId(body.team_id);
-    // Handle initialization failure
-    if (!slack) {
-      return console.error('No authorization found for this team. Did you install the app through the url provided by ngrok?');
-    }
-
-    (async () => {
-      try {
-        // Respond to the message back in the same channel
-        const response = await slack.chat.postMessage({ channel: message.channel, text: `Hello <@${message.user}>! :tada:` });
-      } catch (error) {
-        console.log(error.data);
-      }
-    })();
-  }
 
   // *** Ask if user wants to save a Gist when it detects a code block ***
   // Looks for 3 backticks in every message
   if (!message.subtype && message.text.indexOf('```') >= 0) {
     console.log('backtick message:', message);
     const slack = getClientByTeamId(body.team_id);
-    slack.chat.postMessage({ 
-      channel: message.channel, 
+    slack.chat.postMessage({
+      channel: message.channel,
       text: `Hey, <@${message.user}>, looks like you pasted a code block. Want me to save it for you as a Gist? :floppy_disk:`,
       attachments: [
         {
@@ -137,24 +123,26 @@ slackEvents.on('message', (message, body) => {
       .catch(err => console.log(err))
   }
 
-    // *** Ask if user wants to save a Gist when it detects a code block ***
-  // Looks for 3 backticks in every message
+  // *** Save a gist when 'get gists' is in a message ***
   if (!message.subtype && message.text.indexOf('get gists') >= 0) {
     console.log('getGists message:', message);
     const slack = getClientByTeamId(body.team_id);
 
-    Q.publish('bot', 'getAll', {message: `This is a message from the bot server!`})
-
-
-
+    return superagent.get('https://api.github.com/users/SlackLackey/gists')
+      .then(res => {
+        // console.log(res.body[0].url);
+        const url = res.body[0].url;
+        slack.chat.postMessage({
+          channel: message.channel,
+          text: 'Your gists are here:\n' + url
+        });
+      })
+      .catch(err => console.log(err))
   }
 
 
 });
 
-bot.subscribe('gotAll', (payload) => {
-  console.log('gotAll happened:', payload);
-});
 
 
 
