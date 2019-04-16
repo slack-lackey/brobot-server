@@ -166,13 +166,14 @@ slackEvents.on('message', (message, body) => {
         }
       })
       .then(res => {
-        console.log('response:', res.text);
+        console.log('response:', JSON.parse(res.text));
+        const data = JSON.parse(res.text);
         // Send a link pointing to the new gist
-        // const url = res.body[0].url;
-        // slack.chat.postMessage({
-        //   channel: message.channel,
-        //   text: 'I saved it as a gist for you. You can find it here:\n' + url
-        // });
+        const url = `https://gist.github.com/${data.owner.login}/${data.id}`;
+        slack.chat.postMessage({
+          channel: message.channel,
+          text: 'I saved it as a gist for you. You can find it here:\n' + url
+        });
       })
       .catch(err => console.log(err))
   }
