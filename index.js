@@ -116,7 +116,9 @@ app.use('/slack/actions', slackInteractions.requestListener());
 
 // Listens for every "message" event
 slackEvents.on('message', (message, body) => {
-  console.log('heard message');
+  // console.log('heard message:', message);
+  // console.log('message body:', body);
+
 
   // ***** If message contains 3 backticks, asks if user wants to save a Gist with buttons
   if (!message.subtype && message.text.indexOf('```') >= 0) {
@@ -189,6 +191,75 @@ slackEvents.on('message', (message, body) => {
       })
       .catch(err => console.log(err))
   }
+
+});
+
+slackEvents.on('file_created', (fileEvent, body) => {
+  console.log('file was created 196')
+  console.log('fileEvent', fileEvent);
+
+  const slack = getClientByTeamId(body.team_id);
+  let token = botAuthorizationStorage.getItem(body.team_id);
+
+  return slack.files.info({
+    "token": token,
+    "file": fileEvent.file_id
+  })
+    .then(file => {
+      console.log('210 mode', file.file.mode)
+      if (file.file.mode === 'snippet') {
+        console.log('ITS A SNIPPET');
+        // console.log('the whole file obj', file);
+        console.log('channel to respond to:', file.file.channels[0])
+
+        // CJ0MKER54 - billy & chris
+        // CHW996DHC - everyone
+
+        // Send a message and buttons to save/not save to the user
+        // entire message object is passed in as the "value" of the "save" button
+        slack.chat.postMessage({
+          channel: file.file.channels[0],
+          text: `Hey, <@${file.file.user}>, looks like you made a code snippet. Want me to save it for you as a Gist? :floppy_disk:`,
+          attachments: [
+            {
+              "blocks": [
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Yeah"
+                      },
+                      "value": fileEvent.file_id,
+                      "action_id": "save_gist_snippet",
+                      "style": "primary"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Nah"
+                      },
+                      "value": "click_me_123",
+                      "style": "danger"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        })
+
+
+
+      }
+      // if (file.file)
+    })
+    .catch(err => console.error(err))
 
 });
 
