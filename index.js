@@ -125,7 +125,7 @@ slackEvents.on('message', (message, body) => {
 
   // *** Save a gist when 'get gists' is in a message ***
   if (!message.subtype && message.text.indexOf('get gists') >= 0) {
-    console.log('getGists message:', message);
+    console.log('get gists message:', message);
     const slack = getClientByTeamId(body.team_id);
 
     return superagent.get('https://api.github.com/users/SlackLackey/gists')
@@ -136,6 +136,43 @@ slackEvents.on('message', (message, body) => {
           channel: message.channel,
           text: 'Your gists are here:\n' + url
         });
+      })
+      .catch(err => console.log(err))
+  }
+
+  if (!message.subtype && message.text.indexOf('save gist') >= 0) {
+    // console.log('save gist message:', message);
+        // console.log('save gist message:', message);
+    const slack = getClientByTeamId(body.team_id);
+
+    return superagent.post('https://api.github.com/gists')
+      .set('Authorization', `token ${process.env.GIST_TOKEN}`)
+      .send({
+        "description": "Hello World Examples",
+        "public": true,
+        "files": {
+          "hello_world.rb": {
+            "content": "class HelloWorld\n   def initialize(name)\n      @name = name.capitalize\n   end\n   def sayHi\n      puts \"Hello !\"\n   end\nend\n\nhello = HelloWorld.new(\"World\")\nhello.sayHi"
+          },
+          "hello_world.py": {
+            "content": "class HelloWorld:\n\n    def __init__(self, name):\n        self.name = name.capitalize()\n       \n    def sayHi(self):\n        print \"Hello \" + self.name + \"!\"\n\nhello = HelloWorld(\"world\")\nhello.sayHi()"
+          },
+          "hello_world_ruby.txt": {
+            "content": "Run `ruby hello_world.rb` to print Hello World"
+          },
+          "hello_world_python.txt": {
+            "content": "Run `python hello_world.py` to print Hello World"
+          }
+        }
+      })
+      .then(res => {
+        console.log('response:', res.text);
+        // Send a link pointing to the new gist
+        // const url = res.body[0].url;
+        // slack.chat.postMessage({
+        //   channel: message.channel,
+        //   text: 'I saved it as a gist for you. You can find it here:\n' + url
+        // });
       })
       .catch(err => console.log(err))
   }
