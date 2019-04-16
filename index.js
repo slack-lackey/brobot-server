@@ -1,4 +1,4 @@
-// Load environment variables from `.env` file (optional)
+// Load environment variables from `.env` file
 require('dotenv').config();
 
 const { createEventAdapter } = require('@slack/events-api');
@@ -6,6 +6,7 @@ const { WebClient } = require('@slack/web-api');
 const passport = require('passport');
 const LocalStorage = require('node-localstorage').LocalStorage;
 const SlackStrategy = require('@aoberoi/passport-slack').default.Strategy;
+
 const http = require('http');
 const express = require('express');
 
@@ -107,8 +108,8 @@ slackEvents.on('message', (message, body) => {
                     "emoji": true,
                     "text": "Yeah"
                   },
-                  "value": "click_me_123",
-                  "action_id":"save_gist",
+                  "value": JSON.stringify(message),
+                  "action_id": "save_gist",
                   "style": "primary"
                 },
                 {
@@ -149,7 +150,7 @@ slackEvents.on('message', (message, body) => {
 
   if (!message.subtype && message.text.indexOf('save gist') >= 0) {
     console.log('save gist message:', message);
-        // console.log('save gist message:', message);
+    // console.log('save gist message:', message);
     const slack = getClientByTeamId(body.team_id);
 
     return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
@@ -172,18 +173,35 @@ slackEvents.on('message', (message, body) => {
 slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
   // `payload` contains information about the action
   // see: https://api.slack.com/docs/interactive-message-field-guide#action_url_invocation_payload
-  console.log(payload);
+  // console.log('payload 176:', payload);
+  console.log('original message:', JSON.parse(payload.actions[0].value));
+
+  const message = JSON.parse(payload.actions[0].value)
+
+  return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
+    .send(message)
+    .then((res) => {
+      respond({ 
+        text: 'I saved it as a gist for you. You can find it here:\n' + res.text,
+        replace_original: true 
+      });
+    })
+    .catch((error) => {
+      respond({ text: 'Sorry, there\'s been an error. Try again later.',  replace_original: true });
+    });
+
+
 
   // `respond` is a function that can be used to follow up on the action with a message
-  respond({
-    text: 'Success!',
-  });
+  // respond({
+  //   text: 'Success!',
+  // });
 
   // The return value is used to update the message where the action occurred immediately.
   // Use this to items like buttons and menus that you only want a user to interact with once.
-  return {
-    text: 'Processing...',
-  }
+  // return {
+  //   text: 'Processing...',
+  // }
 });
 
 
@@ -211,6 +229,6 @@ ${JSON.stringify(error.body)}`);
 
 // Start the express application
 const port = process.env.PORT || 3000;
-http.createServer(app).listen(port, () => {
-  console.log(`server listening on port ${port}`);
+app.listen(port, () => {
+  console.log(`Server up on port ${port}`);
 });
