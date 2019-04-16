@@ -271,7 +271,7 @@ slackEvents.on('file_created', (fileEvent, body) => {
 // Block Kit Builder can be used to explore the payload shape for various action blocks:
 // https://api.slack.com/tools/block-kit-builder
 
-// ***** If block interaction "action_id" is "save_gist
+// ***** If block interaction "action_id" is "save_gist"
 slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
 
   // Get the original message object (with the future Gist's content)
@@ -290,6 +290,37 @@ slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
     .catch((error) => {
       respond({ text: 'Sorry, there\'s been an error. Try again later.', replace_original: true });
     });
+
+});
+
+
+// ***** If block interaction "action_id" is "save_gist_snippet"
+slackInteractions.action({ actionId: 'save_gist_snippet' }, (payload, respond) => {
+
+
+  let file_id = payload.actions[0].value;
+  console.log('file ID:', file_id);
+  // Get the file from the id
+  // const snippet = payload
+
+  const slack = getClientByTeamId(body.team_id);
+  let token = botAuthorizationStorage.getItem(body.team_id);
+
+  console.log('token:', token);
+  return slack.files.info({
+    "token": token,
+    "file": file_id
+  })
+    .then(file => {
+      console.log('THE WHOLE FREAKIN SNIPPET', file)
+    })
+    .catch(err => console.error('ERROR on line 317', err))
+
+  // Construct request to API server (in a nicely formatted object)
+
+  // Make a superagent post request to the API server
+
+  // Send Gist URL to user in Slack channel
 
 });
 
