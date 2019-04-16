@@ -90,55 +90,71 @@ slackEvents.on('message', (message, body) => {
   // *** Ask if user wants to save a Gist when it detects a code block ***
   // Looks for 3 backticks in every message
   if (!message.subtype && message.text.indexOf('```') >= 0) {
-    console.log('backtick message:', message);
+    // console.log('backtick message:', message);
     const slack = getClientByTeamId(body.team_id);
-    slack.chat.postMessage({
-      channel: message.channel,
-      text: `Hey, <@${message.user}>, looks like you pasted a code block. Want me to save it for you as a Gist? :floppy_disk:`,
-      attachments: [
-        {
-          "blocks": [
+    // console.log('slack users identity', slack.users.identity);
+
+    let token = botAuthorizationStorage.getItem(body.team_id);
+    // let username;
+
+    return slack.users.info({
+      "token": token,
+      "user": message.user
+    })
+      .then(res => {
+        console.log('line 105')
+        message.username = res.user.profile.display_name
+        console.log('updated message:', message);
+
+        slack.chat.postMessage({
+          channel: message.channel,
+          text: `Hey, <@${message.user}>, looks like you pasted a code block. Want me to save it for you as a Gist? :floppy_disk:`,
+          attachments: [
             {
-              "type": "actions",
-              "elements": [
+              "blocks": [
                 {
-                  "type": "button",
-                  "text": {
-                    "type": "plain_text",
-                    "emoji": true,
-                    "text": "Yeah"
-                  },
-                  "value": JSON.stringify(message),
-                  "action_id": "save_gist",
-                  "style": "primary"
-                },
-                {
-                  "type": "button",
-                  "text": {
-                    "type": "plain_text",
-                    "emoji": true,
-                    "text": "Nah"
-                  },
-                  "value": "click_me_123",
-                  "style": "danger"
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Yeah"
+                      },
+                      "value": JSON.stringify(message),
+                      "action_id": "save_gist",
+                      "style": "primary"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "emoji": true,
+                        "text": "Nah"
+                      },
+                      "value": "click_me_123",
+                      "style": "danger"
+                    }
+                  ]
                 }
               ]
             }
           ]
-        }
-      ]
-    })
-      .catch(err => console.log(err))
+        })
+      })
+
+      .catch(err => console.log(err));
   }
 
   // *** Save a gist when 'get gists' is in a message ***
   if (!message.subtype && message.text.indexOf('get gists') >= 0) {
-    console.log('get gists message:', message);
+    // console.log('get gists message:', message);
     const slack = getClientByTeamId(body.team_id);
 
     return superagent.get('https://api.github.com/users/SlackLackey/gists')
       .then(res => {
-        // console.log(res.body[0].url);
+        console.log('line 156');
         const url = res.body[0].url;
         slack.chat.postMessage({
           channel: message.channel,
@@ -149,14 +165,15 @@ slackEvents.on('message', (message, body) => {
   }
 
   if (!message.subtype && message.text.indexOf('save gist') >= 0) {
-    console.log('save gist message:', message);
+    // console.log('save gist message:', message);
     // console.log('save gist message:', message);
     const slack = getClientByTeamId(body.team_id);
 
     return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
       .send(message)
       .then(res => {
-        console.log('response body URL:', res);
+        console.log('line 174')
+        // console.log('response body URL:', res);
         slack.chat.postMessage({
           channel: message.channel,
           text: 'I saved it as a gist for you. You can find it here:\n' + res.text
@@ -174,34 +191,23 @@ slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
   // `payload` contains information about the action
   // see: https://api.slack.com/docs/interactive-message-field-guide#action_url_invocation_payload
   // console.log('payload 176:', payload);
-  console.log('original message:', JSON.parse(payload.actions[0].value));
+  // console.log('original message:', JSON.parse(payload.actions[0].value));
 
   const message = JSON.parse(payload.actions[0].value)
 
   return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
     .send(message)
     .then((res) => {
-      respond({ 
+      console.log('line 200')
+      respond({
         text: 'I saved it as a gist for you. You can find it here:\n' + res.text,
-        replace_original: true 
+        replace_original: true
       });
     })
     .catch((error) => {
-      respond({ text: 'Sorry, there\'s been an error. Try again later.',  replace_original: true });
+      respond({ text: 'Sorry, there\'s been an error. Try again later.', replace_original: true });
     });
-
-
-
-  // `respond` is a function that can be used to follow up on the action with a message
-  // respond({
-  //   text: 'Success!',
-  // });
-
-  // The return value is used to update the message where the action occurred immediately.
-  // Use this to items like buttons and menus that you only want a user to interact with once.
-  // return {
-  //   text: 'Processing...',
-  // }
+    
 });
 
 
