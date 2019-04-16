@@ -9,6 +9,9 @@ const SlackStrategy = require('@aoberoi/passport-slack').default.Strategy;
 const http = require('http');
 const express = require('express');
 
+const { createMessageAdapter } = require('@slack/interactive-messages');
+const slackInteractions = createMessageAdapter(process.env.SLACK_SIGNING_SECRET);
+
 const superagent = require('superagent');
 
 
@@ -16,6 +19,8 @@ const superagent = require('superagent');
 const slackEvents = createEventAdapter(process.env.SLACK_SIGNING_SECRET, {
   includeBody: true
 });
+
+
 
 // Initialize a Local Storage object to store authorization info
 // NOTE: This is an insecure method and thus for demo purposes only!
@@ -70,9 +75,10 @@ app.get('/auth/slack/callback',
 // *** Plug the event adapter into the express app as middleware ***
 app.use('/slack/events', slackEvents.expressMiddleware());
 
+// *** Plug the interactive message adapter into the express app as middleware ***
+app.use('/slack/actions', slackInteractions.requestListener());
 
-let tempMessage;
-let tempBody;
+
 
 
 // *** Attach listeners to the event adapter ***
@@ -102,6 +108,7 @@ slackEvents.on('message', (message, body) => {
                     "text": "Yeah"
                   },
                   "value": "click_me_123",
+                  "action_id":"save_gist",
                   "style": "primary"
                 },
                 {
@@ -161,28 +168,35 @@ slackEvents.on('message', (message, body) => {
 });
 
 
+// Handle interactions from messages with an `action_id` of `save_gist`
+slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
+  // `payload` contains information about the action
+  // see: https://api.slack.com/docs/interactive-message-field-guide#action_url_invocation_payload
+  console.log(payload);
 
+  // `respond` is a function that can be used to follow up on the action with a message
+  respond({
+    text: 'Success!',
+  });
 
-
-// *** Responding to reactions with the same emoji ***
-slackEvents.on('reaction_added', (event, body) => {
-  // Initialize a client
-  const slack = getClientByTeamId(body.team_id);
-  // Handle initialization failure
-  if (!slack) {
-    return console.error('No authorization found for this team. Did you install the app through the url provided by ngrok?');
+  // The return value is used to update the message where the action occurred immediately.
+  // Use this to items like buttons and menus that you only want a user to interact with once.
+  return {
+    text: 'Processing...',
   }
-  // Respond to the reaction back with the same emoji
-
-  (async () => {
-    try {
-      // Respond to the message back in the same channel
-      const response = await slack.chat.postMessage({ channel: event.item.channel, text: `:${event.reaction}:` });
-    } catch (error) {
-      console.log(error.data);
-    }
-  })();
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 // *** Handle errors ***
 slackEvents.on('error', (error) => {
