@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const express = require('express');
 const superagent = require('superagent');
+const moment = require('moment');
 
 // Slack APIs
 const { WebClient } = require('@slack/web-api');
@@ -128,11 +129,11 @@ slackEvents.on('message', (message, body) => {
     let token = botAuthorizationStorage.getItem(body.team_id);
     return slack.users.info({
       "token": token,
-      "user": message.user
+      "user": message.user,
     })
       .then(res => {
         // attach display name to the message object
-        message.username = res.user.profile.display_name
+        message.username = res.user.profile.display_name;
 
         // Send a message and buttons to save/not save to the user
         // entire message object is passed in as the "value" of the "save" button
@@ -186,10 +187,10 @@ slackEvents.on('message', (message, body) => {
         const url = res.body[0].url;
         slack.chat.postMessage({
           channel: message.channel,
-          text: 'Your gists are here:\n' + url
+          text: 'Your gists are here:\n' + url,
         });
       })
-      .catch(err => console.log(err))
+      .catch(err => console.log(err));
   }
 
 });
@@ -203,14 +204,14 @@ slackEvents.on('file_created', (fileEvent, body) => {
 
   return slack.files.info({
     "token": token,
-    "file": fileEvent.file_id
+    "file": fileEvent.file_id,
   })
     .then(file => {
-      console.log('210 mode', file.file.mode)
+      console.log('210 mode', file.file.mode);
       if (file.file.mode === 'snippet') {
         console.log('ITS A SNIPPET');
         // console.log('the whole file obj', file);
-        console.log('channel to respond to:', file.file.channels[0])
+        console.log('channel to respond to:', file.file.channels[0]);
 
         // CJ0MKER54 - billy & chris
         // CHW996DHC - everyone
@@ -259,7 +260,7 @@ slackEvents.on('file_created', (fileEvent, body) => {
       }
       // if (file.file)
     })
-    .catch(err => console.error(err))
+    .catch(err => console.error(err));
 
 });
 
@@ -275,16 +276,24 @@ slackEvents.on('file_created', (fileEvent, body) => {
 slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
 
   // Get the original message object (with the future Gist's content)
-  const message = JSON.parse(payload.actions[0].value)
+  const message = JSON.parse(payload.actions[0].value);
+
+  // Make an object to send to the API server to save a Gist
+  let title = message.username.replace(/\s+/g, '-').toLowerCase() + '-' + Date.now() + '.js';
+  let description = `Created by ${message.username} on ${moment().format('dddd, MMMM Do YYYY, h:mm:ss a')}`;
+  let content = message.text.slice(message.text.indexOf('```') + 3, message.text.lastIndexOf('```'));
+  const gist = { title, description, content };
+
+  console.log('gist to send:', gist);
 
   // POST request to hosted API server which saves a Gist and returns a URL
   return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
-    .send(message)
+    .send(gist)
     .then((res) => {
-      console.log('line 200')
+      console.log('line 200');
       respond({
         text: 'I saved it as a gist for you. You can find it here:\n' + res.text,
-        replace_original: true
+        replace_original: true,
       });
     })
     .catch((error) => {
@@ -297,31 +306,54 @@ slackInteractions.action({ actionId: 'save_gist' }, (payload, respond) => {
 // ***** If block interaction "action_id" is "save_gist_snippet"
 slackInteractions.action({ actionId: 'save_gist_snippet' }, (payload, respond) => {
 
-
   let file_id = payload.actions[0].value;
   console.log('file ID:', file_id);
-  // Get the file from the id
-  // const snippet = payload
 
-  const slack = getClientByTeamId(body.team_id);
-  let token = botAuthorizationStorage.getItem(body.team_id);
+  const slack = getClientByTeamId(payload.user.team_id);
+  let token = botAuthorizationStorage.getItem(payload.user.team_id);
 
-  console.log('token:', token);
   return slack.files.info({
     "token": token,
-    "file": file_id
+    "file": file_id,
   })
     .then(file => {
-      console.log('THE WHOLE FREAKIN SNIPPET', file)
+      // Get the user's display name and attach to the file object
+      return slack.users.info({
+        "token": token,
+        "user": file.file.user,
+      })
+        .then(res => {
+          file.username = res.user.profile.display_name;
+
+          // Make an object to send to the API server to save a Gist
+          let title;
+          if (file.file.name[0] === '-') {
+            title = file.username.replace(/\s+/g, '-').toLowerCase() + '-' + Date.now() + '.' + file.file.name.split('.').pop();
+          } else {
+            title = file.file.name;
+          }
+          let description = `Created by ${file.username} on ${moment().format('dddd, MMMM Do YYYY, h:mm:ss a')}`;
+          let content = file.content;
+          const gist = { title, description, content };
+
+          console.log('gist to send:', gist);
+
+          // POST request to hosted API server which saves a Gist and returns a URL
+          return superagent.post(`${process.env.BOT_API_SERVER}/createGist`)
+            .send(gist)
+            .then((res) => {
+              console.log('line 200');
+              respond({
+                text: 'I saved it as a gist for you. You can find it here:\n' + res.text,
+                replace_original: true,
+              });
+            })
+            .catch((error) => {
+              respond({ text: 'Sorry, there\'s been an error. Try again later.', replace_original: true });
+            });
+        });
     })
-    .catch(err => console.error('ERROR on line 317', err))
-
-  // Construct request to API server (in a nicely formatted object)
-
-  // Make a superagent post request to the API server
-
-  // Send Gist URL to user in Slack channel
-
+    .catch(err => console.error('ERROR on line 336', err));
 });
 
 
